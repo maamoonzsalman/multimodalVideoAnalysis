@@ -1,10 +1,13 @@
 "use client"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Youtube } from "lucide-react"
+import { getYouTubeVideoId } from "@/app/utils/youtube"
 
 export default function UploadInput() {
     const [url, setUrl] = useState("")
     const [errors, setErrors] = useState({url: ""});
+    const router = useRouter();
 
 
     const validateForm = () => {
@@ -25,7 +28,8 @@ export default function UploadInput() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault() 
         if (!validateForm()) return // keep error showing
-        // your submit logic goes here
+        const id = getYouTubeVideoId(url)!;
+        router.push(`/video/${encodeURIComponent(id)}`);
     }
 
     return (
