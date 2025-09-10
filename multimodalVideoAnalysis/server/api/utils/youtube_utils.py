@@ -1,5 +1,6 @@
 import re
 from fastapi import HTTPException
+from youtube_transcript_api import YouTubeTranscriptApi
 
 def extract_video_id(url: str) -> str | None:
     '''
@@ -23,4 +24,12 @@ def extract_video_id(url: str) -> str | None:
     return match.group(1)
 
 def extract_video_transcript(video_id: str) -> str | None:
-    return "transcript"
+    '''
+    Extract transcript for Youtube video with a given video ID
+    
+    Arg: video_id(str): The Youtube video ID to extract the transcript from
+    '''
+    ytt_api = YouTubeTranscriptApi()
+    transcript = ytt_api.fetch(video_id).to_raw_data()
+    
+    return transcript

@@ -8,5 +8,5 @@ router = APIRouter(
 
 @router.get("/")
 async def fetch_transcript(url: str):
-    video_id = get_video_transcript(url)
-    return {"video_id": video_id}
+    transcript = get_video_transcript(url)
+    return {"transcript": transcript}
