@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from api.controllers.timestamp_controller import get_video_timestamps
 
 router = APIRouter(
-    prefix="/timestamps",
+    prefix='/timestamps',
     tags=['transcript'],
 )
 
