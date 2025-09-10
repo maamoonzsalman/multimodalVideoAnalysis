@@ -53,6 +53,20 @@ def build_timestamp_prompt(transcript: list) -> str:
         "and each value is a very short, clean title for that section (1-5 words). Respond only with valid JSON. No explanation."
     )
 
+def build_chat_prompt(transcript_text: str, inquiry: str):
+    return (
+        "You are an assistant that answers questions about YouTube videos based on transcripts with timestamps.\n\n"
+        "Here is the transcript:\n\n"
+        f"{transcript_text}\n\n"
+        "Here is the user's question:\n\n"
+        f"{inquiry}\n\n"
+        "Please return your response in **valid JSON format** as shown below:\n"
+        "{\n"
+        "  \"response\": \"<your answer here with [timestamp] citations at relevant points>\"\n"
+        "}\n"
+        "Be concise. Use only timestamps present in the transcript, and insert them at relevant points inside square brackets. If the answer is not in the video, then convey that."
+    )
+
 def query_gemini(prompt: str):
     response = gemini_model.generate_content([prompt])
     raw = response.text.strip("```json").strip("```").strip()
