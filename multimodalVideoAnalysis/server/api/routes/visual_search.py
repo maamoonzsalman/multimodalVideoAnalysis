@@ -8,7 +8,8 @@ router = APIRouter(
 )
 
 @router.get('/')
-async def fetch_visual_content(url: str, inquiry: str):
-    res = get_visuals(url, inquiry)
-    return {"result": res}
+async def fetch_visual_content(video_id: str, inquiry: str):
+    res = get_visuals(video_id, inquiry)
+    timestamps = [item["timestamp"] for item in res]
+    return { "timestamps": timestamps } 
     

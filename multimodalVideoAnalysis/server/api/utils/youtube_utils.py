@@ -34,23 +34,52 @@ def extract_video_transcript(video_id: str) -> str | None:
     Raises: HTTPException if transcript can not be retrieved 
 
     '''
-    ytt_api = YouTubeTranscriptApi()
-    transcript = ytt_api.fetch(video_id).to_raw_data()
-
-    if not transcript:
+    try:
+        ytt_api = YouTubeTranscriptApi()
+        raw_transcript = ytt_api.fetch(video_id).to_raw_data()
+    except Exception as e:
         raise HTTPException(
-            staus_code = 400,
-            details = "Unable to retrieve transcript. Perhaps video ID is incorrect, or there are internal issues with Youtube API"
+            status_code=400,
+            detail=f"Unable to retrieve transcript: {str(e)}"
         )
-    
+
+    if not raw_transcript:
+        raise HTTPException(
+            status_code=400,
+            detail="Transcript is empty or unavailable."
+        )
+
+    # Transform timestamps into HH:MM:SS
+    transcript = [
+        {
+            "text": item["text"],
+            "start": seconds_to_hms(item["start"]),
+            "duration": seconds_to_hms(item["duration"])
+        }
+        for item in raw_transcript
+    ]
+
     return transcript
+
+def seconds_to_hms(seconds: float) -> str:
+    """
+    Convert float seconds to HH:MM:SS format.
+    """
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours:02}:{minutes:02}:{secs:02}"
 
 def build_timestamp_prompt(transcript: list) -> str:
     return (
         "Here's a transcript with timestamps from a YouTube video:\n\n"
         f"{transcript}\n\n"
-        "Return a JSON object where each key is the timestamp (like '0:42') of a new scene/topic, "
-        "and each value is a very short, clean title for that section (1-5 words). Respond only with valid JSON. No explanation."
+        "Your task: segment the ENTIRE video into topics/scenes using the provided timestamps. "
+        "Go through the FULL transcript until the very last timestamp — do NOT stop early.\n\n"
+        "Return a JSON object where each key is the timestamp (like '0:42') marking the start of a new scene/topic, "
+        "and each value is a very short, clean title for that section (1-5 words). "
+        "Respond ONLY with valid JSON. No explanation. Ensure the segmentation spans the WHOLE video duration."
     )
 
 def build_chat_prompt(transcript_text: str, inquiry: str):
@@ -71,3 +100,18 @@ def query_gemini(prompt: str):
     response = gemini_model.generate_content([prompt])
     raw = response.text.strip("```json").strip("```").strip()
     return json.loads(raw)
+
+def format_timestamps_to_array(timestamps: dict) -> list:
+    """
+    Convert a dictionary of timestamps into an array of objects.
+    
+    Args:
+        timestamps (dict): Example -> {"0:00": "Intro", "0:10": "Details"}
+    
+    Returns:
+        list: Example -> [{"timestamp": "0:00", "title": "Intro"}, {"timestamp": "0:10", "title": "Details"}]
+    """
+    return [
+        {"id": idx + 1, "timestamp": ts, "title": title}
+        for idx, (ts, title) in enumerate(timestamps.items())
+    ]

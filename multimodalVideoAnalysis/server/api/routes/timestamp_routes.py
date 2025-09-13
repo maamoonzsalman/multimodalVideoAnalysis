@@ -7,6 +7,6 @@ router = APIRouter(
 )
 
 @router.get("/")
-async def fetch_timestamps(url: str):
-    timestamps_transcript = get_video_timestamps(url)
-    return {"timestamps": timestamps_transcript[0], "transcript": timestamps_transcript[1]}
+async def fetch_timestamps(video_id: str):
+    timestamps = get_video_timestamps(video_id)
+    return { "timestamps": timestamps }

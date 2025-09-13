@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Bot, Send, User } from "lucide-react";
+import { Bot, Send, User, Loader2 } from "lucide-react";
+import axios from "axios";
 
 type Message = {
   id: string;
@@ -8,7 +9,12 @@ type Message = {
   text: string;
 };
 
-export default function ChatInterface() {
+type Props = {
+    id: string;
+};
+
+
+export default function ChatInterface({ id }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "m-1",
@@ -18,9 +24,11 @@ export default function ChatInterface() {
     },
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true)
     if (!input.trim()) return;
 
     setMessages((prev) => [
@@ -29,16 +37,24 @@ export default function ChatInterface() {
     ]);
     setInput("");
 
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "bot",
-          text: "Great question! (This is a placeholder response.)",
-        },
-      ]);
-    }, 400);
+    try {
+        const res = await axios.get(`http://127.0.0.1:8000/chat/`, {
+        params: { inquiry: input.trim(), video_id: id }
+        });
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "bot",
+            text: res.data.response.response,
+          },
+        ]);
+        setIsLoading(false)
+    } catch (err) {
+        console.error("Error fetching bot's respons: ", err)
+    }
+ 
   };
 
   return (
@@ -89,7 +105,12 @@ export default function ChatInterface() {
             className="shrink-0 p-2 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
             aria-label="Send"
           >
-            <Send className="w-4 h-4 text-white" />
+            {!isLoading ? (
+              <Send className="w-4 h-4 text-white" />
+            ): (
+              <Loader2 className="w-4 h-4 text-white animate-spin" />
+            )}
+            
           </button>
         </form>
       </div>
