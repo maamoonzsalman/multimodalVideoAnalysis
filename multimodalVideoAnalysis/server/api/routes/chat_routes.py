@@ -7,6 +7,6 @@ router = APIRouter(
 )
 
 @router.get("/")
-async def fetch_chat(transcript, inquiry: str):
-    response = get_chat_response(transcript, inquiry)
-    return response
+async def fetch_chat(inquiry: str, video_id: str):
+    response = get_chat_response(inquiry, video_id)
+    return { "response": response }
