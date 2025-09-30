@@ -1,23 +1,73 @@
-from fastapi import HTTPException
 import cv2
 import yt_dlp
 from api.core.clip import model, processor, device
 import torch
 import numpy as np
+# utils/visual_search_utils.py
+from fastapi import HTTPException
+from yt_dlp import YoutubeDL
+import tempfile
+import os
 
-def get_stream_url(video_id: str):
-    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
-    ydl_opts = {"format": "best"}
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(youtube_url, download=False)
-        
-        if not info:
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to retrieve a valid stream URL for the given video ID."
-            )
-        return info["url"]
+def get_stream_url(video_id: str) -> str:
+    url = f"https://www.youtube.com/watch?v={video_id}"
+
+    # Try: Android client + mp4 preference
+    primary_opts = {
+        "quiet": True,
+        "noplaylist": True,
+        "skip_download": True,
+        "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
+        "extractor_args": {"youtube": {"player_client": ["android"]}},
+    }
+
+    try:
+        with YoutubeDL(primary_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            # 1) If yt-dlp gave us a top-level url, use it
+            if info.get("url"):
+                return info["url"]
+            # 2) Otherwise pick a playable format with a direct URL
+            fmts = info.get("formats", []) or []
+            # Prefer progressive/mp4 with both audio+video
+            for f in reversed(fmts):
+                if f.get("url") and f.get("vcodec") != "none" and f.get("acodec") != "none":
+                    return f["url"]
+            # Fallback: any video format with a URL
+            for f in reversed(fmts):
+                if f.get("url") and f.get("vcodec") != "none":
+                    return f["url"]
+    except Exception as e:
+        # fall through to download fallback
+        pass
+
+    # 3) Last resort: download a small progressive mp4 locally and return the path
+    # (OpenCV can read local files reliably.)
+    try:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        tmp_path = tmp.name
+        tmp.close()
+
+        fallback_opts = {
+            "quiet": True,
+            "noplaylist": True,
+            "outtmpl": tmp_path,
+            # aim for a progressive mp4 to keep it light
+            "format": "mp4[height<=480]/best[ext=mp4]/best",
+        }
+        with YoutubeDL(fallback_opts) as ydl:
+            ydl.download([url])
+
+        if os.path.getsize(tmp_path) == 0:
+            raise RuntimeError("Downloaded file is empty")
+        return tmp_path  # Pass this to cv2.VideoCapture(...)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not obtain a playable stream for this video (YouTube SABR/format restrictions). "
+                   f"Try another video or update yt-dlp. Error: {e}"
+        )
+
     
 def extract_frames_with_timestamps(stream_url: str, frame_interval: int=30):
     frames_with_timestamps = []
