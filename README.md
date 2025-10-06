@@ -24,7 +24,6 @@ The app uses **React** for an intuitive frontend, **FastAPI** for the backend, a
 - **Backend:** FastAPI (Python)  
 - **AI Models:** Google Gemini, CLIP (OpenAI), Mistral for embeddings  
 - **Data Processing:** yt-dlp, ffmpeg, numpy, torch  
-- **Database:** PostgreSQL (SQLAlchemy ORM)  
 - **API Design:** RESTful architecture  
 
 ---
