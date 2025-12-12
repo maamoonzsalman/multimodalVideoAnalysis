@@ -14,20 +14,27 @@ export default function VideoSections({ id }: Props) {
         title: string;
     }
     const [segments, setSegments] = useState<Segment[]>([]);
-    const [isLoading, setIsLoading] = useState(true)
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     
     useEffect(() => {
         async function fetchSegments() {
             try {
                 console.log("id prop in VideoSections:", id);
 
+                setIsLoading(true);
+                setError(null);
+
                 const res = await axios.get(`http://127.0.0.1:8000/timestamps/`, {
                     params: { video_id: id },
                 });
                 setSegments(res.data.timestamps);
-                setIsLoading(false)
             } catch (err) {
                 console.error("Error fetching segments:", err);
+                setError("Unable to generate sections for this video. Captions may be disabled or unavailable.");
+                setSegments([]);
+            } finally {
+                setIsLoading(false);
             }
         }
 
@@ -48,7 +55,11 @@ export default function VideoSections({ id }: Props) {
 
             <div className='bg-black/40 p-4 rounded-b-lg border-purple-500/50 border-b-1 border-x-1 space-y-2 max-h-102 h-102 overflow-y-auto'>
                 
-                {isLoading ? (
+                {error ? (
+                    <div className="text-red-400 text-sm text-center py-4 px-2 bg-red-900/20 rounded-lg border border-red-500/30">
+                        {error}
+                    </div>
+                ) : isLoading ? (
                     <div className="flex items-center justify-center py-8">
                         <div className="text-center space-y-3">
                             <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto" />

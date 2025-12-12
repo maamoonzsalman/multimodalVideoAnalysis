@@ -1,7 +1,12 @@
 import re
 from fastapi import HTTPException
 import json
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import (
+    YouTubeTranscriptApi,
+    TranscriptsDisabled,
+    NoTranscriptFound,
+)
+from youtube_transcript_api._errors import YouTubeRequestFailed
 from api.core.gemini import gemini_model
 
 def extract_video_id(url: str) -> str | None:
@@ -25,6 +30,8 @@ def extract_video_id(url: str) -> str | None:
     
     return match.group(1)
 
+PREFERRED_TRANSCRIPT_LANGUAGES = ["en", "en-US", "en-GB"]
+
 def extract_video_transcript(video_id: str) -> str | None:
     '''
     Extract transcript for Youtube video with a given video ID
@@ -35,12 +42,52 @@ def extract_video_transcript(video_id: str) -> str | None:
 
     '''
     try:
-        ytt_api = YouTubeTranscriptApi()
-        raw_transcript = ytt_api.fetch(video_id).to_raw_data()
+        transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+    except TranscriptsDisabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Captions are disabled for this video, so timestamps cannot be generated."
+        )
     except Exception as e:
         raise HTTPException(
             status_code=400,
             detail=f"Unable to retrieve transcript: {str(e)}"
+        )
+
+    # Try to grab one of the preferred languages first
+    transcript = None
+    try:
+        transcript = transcripts.find_transcript(PREFERRED_TRANSCRIPT_LANGUAGES)
+    except NoTranscriptFound:
+        # Fall back to translating the first available transcript into English
+        try:
+            arbitrary_transcript = next(iter(transcripts))
+        except StopIteration:
+            raise HTTPException(
+                status_code=400,
+                detail="No transcripts are available for this video."
+            )
+
+        try:
+            transcript = arbitrary_transcript.translate("en")
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail="No English (or translatable) transcript is available for this video."
+            )
+
+    try:
+        raw_transcript = transcript.fetch()
+    except YouTubeRequestFailed as exc:
+        message = str(exc)
+        if "429" in message or "Too Many Requests" in message:
+            raise HTTPException(
+                status_code=429,
+                detail="YouTube temporarily rate-limited transcript requests. Please try again in a minute."
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to retrieve transcript: {message}"
         )
 
     if not raw_transcript:
